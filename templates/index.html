@@ -1,0 +1,49 @@
+<!-- /templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bittensor Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/styles.css') }}">
+    <style>
+        body {
+            background: #181c20;
+            color: #f3f4f6;
+        }
+        .centered-content {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .dashboard-btn {
+            width: 320px;
+            margin-bottom: 1.5rem;
+            font-size: 1.25rem;
+        }
+        .dashboard-btn:last-child {
+            margin-bottom: 0;
+        }
+        h1 {
+            color: #fff;
+            font-weight: 700;
+            margin-bottom: 2.5rem;
+        }
+        .dashboard-description {
+            color: #cbd5e1;
+            margin-bottom: 2.5rem;
+            font-size: 1.15rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="centered-content">
+        <h1>Bittensor Dashboard</h1>
+        <p class="dashboard-description">Explore real-time data and visualizations across subnets in the Bittensor ecosystem.</p>
+        <a href="/financial" class="btn btn-primary dashboard-btn">View Subnet Financial Data</a>
+        <a href="/emissions" class="btn btn-primary dashboard-btn">View Subnet Emissions Visualizations</a>
+    </div>
+</body>
+</html>
