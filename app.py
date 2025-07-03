@@ -7,7 +7,6 @@ from flask_sqlalchemy import SQLAlchemy
 from subnetFinancialData import fetch_financial_data
 import json
 from datetime import datetime
-from models import db, SubnetEmission
 
 app = Flask(__name__)
 
