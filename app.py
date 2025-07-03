@@ -12,7 +12,6 @@ import seaborn as sns
 from datetime import datetime
 import json
 from datetime import datetime, timedelta
-from flask_caching import Cache
 
 app = Flask(__name__)
 
@@ -28,8 +27,6 @@ else:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-
-cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 
 class SubnetEmission(db.Model):
     id = db.Column(db.Integer, primary_key=True)
