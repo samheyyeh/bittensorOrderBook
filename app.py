@@ -60,6 +60,11 @@ def subnet_detail(netuid):
     subnet_name = subnet_names.get(netuid, f"Subnet {netuid}")
     return render_template('subnetDetail.html', data=data, subnet_name=subnet_name)
 
+@app.route('/logs')
+def show_logs():
+    logs = SubnetLog.query.order_by(SubnetLog.timestamp.desc()).limit(10).all()
+    return '<br>'.join([str(log) for log in logs])
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
