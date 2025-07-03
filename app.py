@@ -9,6 +9,12 @@ import json
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, db as firebase_db
+import base64
+
+# Decode firebase_key.json from environment variable if present
+if os.environ.get('FIREBASE_KEY_BASE64'):
+    with open('firebase_key.json', 'wb') as f:
+        f.write(base64.b64decode(os.environ['FIREBASE_KEY_BASE64']))
 
 # Initialize Firebase (only once)
 if not firebase_admin._apps:
