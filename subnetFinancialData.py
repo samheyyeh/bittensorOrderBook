@@ -12,6 +12,9 @@ try:
 except ImportError:
     pass
 
+import json
+from datetime import datetime, timedelta
+
 HEADERS = {
     "accept": "application/json",
     "Authorization": os.environ.get("TAOSTATS_API_KEY", "")
@@ -32,9 +35,12 @@ RAO_DIVISOR = 10**9
 
 # Rate limiting: 5 requests per minute
 TAOSTATS_RATE_LIMIT = 5
-TAOSTATS_TIME_WINDOW = 20  # seconds
+TAOSTATS_TIME_WINDOW = 60  # seconds
 _taostats_request_times = []
 _taostats_lock = threading.Lock()
+
+CACHE_FILE = "instance/financial_cache.json"
+CACHE_TTL = timedelta(minutes=5)
 
 def taostats_rate_limited_request(*args, **kwargs):
     """Wrap requests.get to rate limit Taostats API calls to 5 per minute."""
@@ -141,6 +147,23 @@ def get_all_subnet_financial_data():
         batch = subnet_ids[i:i+4]
         for netuid in batch:
             results.append(fetch_financial_data(netuid, tao_price_usd=tao_price_usd))
-        if i + 4 < len(subnet_ids):
-            time.sleep(60)  # Wait 60 seconds before next batch
+        # Removed time.sleep(60) to avoid Heroku request timeouts. Consider using a background job for periodic data refresh.
     return results
+
+def get_cached_financial_data():
+    try:
+        with open(CACHE_FILE, "r") as f:
+            cache = json.load(f)
+        cache_time = datetime.fromisoformat(cache["timestamp"])
+        if datetime.utcnow() - cache_time < CACHE_TTL:
+            return cache["data"]
+    except Exception:
+        pass
+    # Cache is missing or expired, refresh it
+    data = get_all_subnet_financial_data()
+    try:
+        with open(CACHE_FILE, "w") as f:
+            json.dump({"timestamp": datetime.utcnow().isoformat(), "data": data}, f)
+    except Exception:
+        pass
+    return data

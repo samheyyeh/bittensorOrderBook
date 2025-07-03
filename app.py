@@ -4,12 +4,15 @@ from flask import Flask, render_template, jsonify
 import pandas as pd
 import os
 from flask_sqlalchemy import SQLAlchemy
-from subnetFinancialData import get_all_subnet_financial_data
+from subnetFinancialData import get_cached_financial_data
 import matplotlib
 matplotlib.use('Agg')  # Use non-GUI backend for server
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
+import json
+from datetime import datetime, timedelta
+from flask_caching import Cache
 
 app = Flask(__name__)
 
@@ -25,6 +28,8 @@ else:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 
 class SubnetEmission(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -168,7 +173,7 @@ def home():
 
 @app.route('/financial')
 def financial_dashboard():
-    data = get_all_subnet_financial_data()
+    data = get_cached_financial_data()
     return render_template('subnetFinancialData.html', data=data)
 
 @app.route('/emissions')
