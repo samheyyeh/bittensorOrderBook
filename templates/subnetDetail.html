@@ -75,11 +75,11 @@
         {% else %}
             <p>No financial data available for this subnet.</p>
         {% endif %}
-        {% if plots and plots|length > 0 %}
+        {% if plot_titles and plot_titles|length > 0 %}
             <div class="emissions-chart">
-                {% for title, path in plots.items() %}
+                {% for plot_type, title in plot_titles.items() %}
                     <h4>{{ title }}</h4>
-                    <img src="{{ url_for('static', filename=path) }}" class="img-fluid border rounded shadow-sm mb-4" alt="{{ title }}">
+                    <img src="{{ url_for('subnet_plot', netuid=netuid, plot_type=plot_type) }}" class="img-fluid border rounded shadow-sm mb-4" alt="{{ title }}">
                 {% endfor %}
             </div>
         {% else %}

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, send_file, abort
 import pandas as pd
 import os
 from flask_sqlalchemy import SQLAlchemy
@@ -49,6 +49,17 @@ PLOT_FILENAMES = [
     "rank_histogram.png",
     "uid_growth.png"
 ]
+
+# Define plot types and titles for the template
+PLOT_TITLES = {
+    "stake_over_time": "Stake Over Time",
+    "emission_vs_stake": "Emission vs Stake",
+    "weekly_emissions": "Weekly Emissions",
+    "emission_vs_rank": "Emission vs Rank",
+    "subnet_efficiency": "Subnet Efficiency (Emission per Stake)",
+    "rank_histogram": "Rank Distribution Histogram",
+    "uid_growth": "Subnet Growth Over Time (Unique UIDs)"
+}
 
 def generate_emission_plots():
     # Query all data
@@ -147,16 +158,23 @@ def generate_emission_plots():
 def home():
     return render_template('index.html', subnets=subnet_names)
 
+@app.route('/subnet/<int:netuid>/plot/<plot_type>')
+def subnet_plot(netuid, plot_type):
+    from generate_emission_plots import generate_plot_for_type
+    if plot_type not in PLOT_TITLES:
+        abort(404)
+    img = generate_plot_for_type(netuid, plot_type)
+    if img is None:
+        abort(404)
+    return send_file(img, mimetype='image/png')
+
 @app.route('/subnet/<int:netuid>')
 def subnet_detail(netuid):
     # Fetch financial data for this subnet
     data = fetch_financial_data(netuid)
-    # Import here to avoid circular import
     from generate_emission_plots import generate_all_subnet_charts
-    # Generate all charts for this subnet
-    plots = generate_all_subnet_charts(netuid)
     subnet_name = subnet_names.get(netuid, f"Subnet {netuid}")
-    return render_template('subnetDetail.html', data=data, plots=plots, subnet_name=subnet_name)
+    return render_template('subnetDetail.html', data=data, subnet_name=subnet_name, netuid=netuid, plot_titles=PLOT_TITLES)
 
 if __name__ == '__main__':
     with app.app_context():

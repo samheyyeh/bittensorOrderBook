@@ -5,6 +5,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 from models import db, SubnetEmission
+from io import BytesIO
 
 subnet_names = {
     3: "Templar",
@@ -244,6 +245,79 @@ def generate_single_subnet_plot(netuid):
     plt.savefig(plot_path)
     plt.close()
     return f"plots/emissions_{netuid}.png"
+
+def generate_plot_for_type(netuid, plot_type):
+    records = SubnetEmission.query.filter_by(subnet_id=netuid).all()
+    if not records:
+        return None
+    df = pd.DataFrame([r.to_dict() for r in records])
+    df = df.sort_values("timestamp")
+    subnet_name = subnet_names.get(netuid, f"Subnet {netuid}")
+    sns.set(style="whitegrid", context="talk")
+    buf = BytesIO()
+
+    if plot_type == "stake_over_time":
+        plt.figure(figsize=(14, 6))
+        plt.plot(df["timestamp"], df["stake"], label="Stake", alpha=0.7)
+        plt.title(f"Stake Over Time: {subnet_name}")
+        plt.xlabel("Timestamp")
+        plt.ylabel("Stake")
+        plt.tight_layout()
+    elif plot_type == "emission_vs_stake":
+        plt.figure(figsize=(10, 6))
+        sns.scatterplot(data=df, x="stake", y="emission", alpha=0.6)
+        plt.title(f"Emission vs Stake: {subnet_name}")
+        plt.xlabel("Stake")
+        plt.ylabel("Emission")
+        plt.tight_layout()
+    elif plot_type == "weekly_emissions":
+        df.set_index("timestamp", inplace=True)
+        weekly_emission = df["emission"].resample("W").sum().reset_index()
+        plt.figure(figsize=(14, 6))
+        sns.lineplot(data=weekly_emission, x="timestamp", y="emission", marker="o")
+        plt.title(f"Weekly Emissions: {subnet_name}")
+        plt.xlabel("Week")
+        plt.ylabel("Total Emission")
+        plt.tight_layout()
+        df.reset_index(inplace=True)
+    elif plot_type == "emission_vs_rank":
+        plt.figure(figsize=(10, 6))
+        sns.scatterplot(data=df, x="rank", y="emission", alpha=0.6)
+        plt.title(f"Emission vs Rank: {subnet_name}")
+        plt.xlabel("Rank")
+        plt.ylabel("Emission")
+        plt.tight_layout()
+    elif plot_type == "subnet_efficiency":
+        df["efficiency"] = df["emission"] / (df["stake"] + 1e-9)
+        eff_df = df.groupby("uid")["efficiency"].mean().sort_values(ascending=False)
+        plt.figure(figsize=(10, 6))
+        sns.barplot(x=eff_df.values, y=eff_df.index, palette="magma")
+        plt.title(f"Subnet Efficiency (Emission per Stake): {subnet_name}")
+        plt.xlabel("Avg Efficiency")
+        plt.ylabel("UID")
+        plt.tight_layout()
+    elif plot_type == "rank_histogram":
+        plt.figure(figsize=(10, 6))
+        sns.histplot(data=df, x="rank", bins=50, element="step", stat="count", common_norm=False)
+        plt.title(f"Rank Distribution: {subnet_name}")
+        plt.xlabel("Rank")
+        plt.ylabel("Count")
+        plt.tight_layout()
+    elif plot_type == "uid_growth":
+        df["date"] = pd.to_datetime(df["timestamp"]).dt.date
+        uid_growth = df.groupby(["date"])["uid"].nunique().reset_index()
+        plt.figure(figsize=(14, 6))
+        sns.lineplot(data=uid_growth, x="date", y="uid", marker="o")
+        plt.title(f"Subnet Growth Over Time (Unique UIDs): {subnet_name}")
+        plt.xlabel("Date")
+        plt.ylabel("Unique UIDs")
+        plt.tight_layout()
+    else:
+        return None
+    plt.savefig(buf, format='png')
+    plt.close()
+    buf.seek(0)
+    return buf
 
 if __name__ == "__main__":
     with app.app_context():
