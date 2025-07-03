@@ -154,9 +154,13 @@ def get_all_subnet_financial_data():
 def get_all_subnet_financial_data_batch(subnet_ids, tao_price_usd):
     results = []
     for i, netuid in enumerate(subnet_ids):
-        results.append(fetch_financial_data(netuid, tao_price_usd=tao_price_usd))
+        data = fetch_financial_data(netuid, tao_price_usd=tao_price_usd)
+        print(f"[DEBUG] Data for subnet {netuid}: {data}")
+        results.append(data)
         if i < len(subnet_ids) - 1:
-            time.sleep(13)  # Pause to avoid burst rate limiting (5 req/min)
+            print(f"[DEBUG] Sleeping 60 seconds before next Taostats API request...")
+            time.sleep(60)  # Strict rate limiting: 1 request per minute
+    print(f"[DEBUG] Batch results: {results}")
     return results
 
 # Helper to get the next batch of subnets to update
