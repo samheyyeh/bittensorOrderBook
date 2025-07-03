@@ -86,4 +86,8 @@ def api_subnet_data(netuid):
 
 if __name__ == '__main__':
     # Remove or comment out db.create_all() if not needed
+    print("FIREBASE_KEY_BASE64 present:", bool(os.environ.get('FIREBASE_KEY_BASE64')))
+    print("firebase_key.json exists:", os.path.exists('firebase_key.json'))
+    if os.path.exists('firebase_key.json'):
+        print("firebase_key.json size:", os.path.getsize('firebase_key.json'))
     app.run(debug=True)
