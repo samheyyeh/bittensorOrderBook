@@ -159,7 +159,7 @@ def get_all_subnet_financial_data_batch(subnet_ids, tao_price_usd):
         results.append(data)
         if i < len(subnet_ids) - 1:
             print(f"[DEBUG] Sleeping 60 seconds before next Taostats API request...")
-            time.sleep(60)  # Strict rate limiting: 1 request per minute
+            time.sleep(20)  # Strict rate limiting: 1 request per minute
     print(f"[DEBUG] Batch results: {results}")
     return results
 
@@ -190,33 +190,37 @@ def refresh_cache_async():
             batch_results = get_all_subnet_financial_data_batch(batch, tao_price_usd)
             for row in batch_results:
                 all_results[row["netuid"]] = row
+            # Write cache after each batch
+            try:
+                with open(CACHE_FILE, "w") as f:
+                    json.dump({
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "data": list(all_results.values())
+                    }, f)
+                print(f"[DEBUG] Cache written after batch {batch}: {list(all_results.values())}")
+            except Exception as e:
+                print(f"[DEBUG] Error writing cache after batch {batch}: {e}")
             if i + BATCH_SIZE < len(subnet_ids):
                 print(f"[DEBUG] Sleeping 60 seconds before next batch...")
                 time.sleep(60)
-        # Save updated cache
-        try:
-            with open(CACHE_FILE, "w") as f:
-                json.dump({
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "data": list(all_results.values())
-                }, f)
-        except Exception:
-            pass
     threading.Thread(target=refresh, daemon=True).start()
 
+# Add debug print after cache read in get_cached_financial_data
 def get_cached_financial_data():
     try:
         with open(CACHE_FILE, "r") as f:
             cache = json.load(f)
         cache_time = datetime.fromisoformat(cache["timestamp"])
         data = cache.get("data", [])
+        print(f"[DEBUG] Cache read: {data}")
         if datetime.utcnow() - cache_time < CACHE_TTL:
             return data
         else:
             # Serve stale data, refresh in background
             refresh_cache_async()
             return data
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG] Error reading cache: {e}")
         # No cache, trigger refresh and return empty
         refresh_cache_async()
         return []
