@@ -53,6 +53,7 @@
     <a href="/" class="btn btn-secondary back-btn">Back to Home</a>
     <div class="container mt-4">
         <h1>{{ subnet_name }} Financial Data</h1>
+        
         {% if data %}
             <div class="scroll-x">
                 <table class="table table-dark table-bordered mb-0">
@@ -75,6 +76,207 @@
         {% else %}
             <p>No financial data available for this subnet.</p>
         {% endif %}
-    </div>
+
+        <h2>{{ subnet_name }} Subnet Details</h2>
+
+<div>
+  <canvas id="dailyTotalStake"></canvas>
+</div>
+<div>
+  <canvas id="dailyTotalEmission"></canvas>
+</div>
+<div>
+  <canvas id="activeUidsDaily"></canvas>
+</div>
+<div>
+  <canvas id="avgRankDaily"></canvas>
+</div>
+<div>
+  <canvas id="stakeVsEmission"></canvas>
+</div>
+<div>
+  <canvas id="rankHistogram"></canvas>
+</div>
+<div>
+  <canvas id="uidsHeatmap"></canvas>
+</div>
+<div>
+  <canvas id="stakeMovingAvg"></canvas>
+</div>
+<div>
+  <canvas id="emissionMovingAvg"></canvas>
+</div>
+<div>
+  <canvas id="uidsMovingAvg"></canvas>
+</div>
+<div>
+  <canvas id="cumulativeStake"></canvas>
+</div>
+<div>
+  <canvas id="cumulativeEmission"></canvas>
+</div>
+</div>
 </body>
-</html> 
+</html>
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+<script>
+fetch(`/api/subnet_data/{{ netuid }}`)
+  .then(res => res.json())
+  .then(data => {
+    if (!data.length) {
+      document.body.innerHTML += '<p>No data available for this subnet.</p>';
+      return;
+    }
+    // --- Data Preparation ---
+    // Parse and group by date
+    const parseDate = ts => ts.split(' ')[0];
+    const groupBy = (arr, keyFn) => arr.reduce((acc, x) => {
+      const k = keyFn(x);
+      acc[k] = acc[k] || [];
+      acc[k].push(x);
+      return acc;
+    }, {});
+    const dates = [...new Set(data.map(d => parseDate(d.timestamp)))].sort();
+    // 1. Daily Total Stake per Subnet
+    const stakeByDate = groupBy(data, d => parseDate(d.timestamp));
+    const dailyStake = dates.map(date => ({
+      date,
+      stake: stakeByDate[date].reduce((sum, d) => sum + d.stake, 0)
+    }));
+    // 2. Daily Total Emission per Subnet
+    const dailyEmission = dates.map(date => ({
+      date,
+      emission: stakeByDate[date].reduce((sum, d) => sum + d.emission, 0)
+    }));
+    // 3. Active Unique UIDs per Subnet (Daily)
+    const dailyUids = dates.map(date => ({
+      date,
+      uids: new Set(stakeByDate[date].map(d => d.uid)).size
+    }));
+    // 4. Average Rank per Subnet (Daily)
+    const dailyAvgRank = dates.map(date => ({
+      date,
+      avgRank: stakeByDate[date].reduce((sum, d) => sum + d.rank, 0) / stakeByDate[date].length
+    }));
+    // 5. Stake vs. Emission Scatter (All Data)
+    const scatterData = data.map(d => ({ x: d.stake, y: d.emission }));
+    // 6. Rank Distribution Histogram (All Data)
+    const rankBins = Array(20).fill(0);
+    data.forEach(d => {
+      const bin = Math.min(19, Math.floor(d.rank * 20));
+      rankBins[bin]++;
+    });
+    // 7. Heatmap of Active UIDs × Date
+    // For a single subnet, this is just dailyUids, but we'll show as a bar for each day
+    // 8. Moving-Average Trends (7-day)
+    function movingAvg(arr, key) {
+      const res = [];
+      for (let i = 0; i < arr.length; i++) {
+        const start = Math.max(0, i - 6);
+        const vals = arr.slice(start, i + 1).map(x => x[key]);
+        res.push(vals.reduce((a, b) => a + b, 0) / vals.length);
+      }
+      return res;
+    }
+    const stakeMA = movingAvg(dailyStake, 'stake');
+    const emissionMA = movingAvg(dailyEmission, 'emission');
+    const uidsMA = movingAvg(dailyUids, 'uids');
+    // 9. Cumulative Stake and Emission Over Time
+    let cumStake = 0, cumEmission = 0;
+    const cumulativeStake = dailyStake.map(d => cumStake += d.stake);
+    const cumulativeEmission = dailyEmission.map(d => cumEmission += d.emission);
+
+    // --- Chart Rendering ---
+    // 1. Daily Total Stake
+    new Chart(document.getElementById('dailyTotalStake'), {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [{ label: 'Total Stake', data: dailyStake.map(d => d.stake), borderColor: 'blue', fill: false }]
+      },
+      options: { plugins: { title: { display: true, text: 'Daily Total Stake' } } }
+    });
+    // 2. Daily Total Emission
+    new Chart(document.getElementById('dailyTotalEmission'), {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [{ label: 'Total Emission', data: dailyEmission.map(d => d.emission), borderColor: 'green', fill: false }]
+      },
+      options: { plugins: { title: { display: true, text: 'Daily Total Emission' } } }
+    });
+    // 3. Active Unique UIDs per Subnet (Daily)
+    new Chart(document.getElementById('activeUidsDaily'), {
+      type: 'bar',
+      data: {
+        labels: dates,
+        datasets: [{ label: 'Active UIDs', data: dailyUids.map(d => d.uids), backgroundColor: 'purple' }]
+      },
+      options: { plugins: { title: { display: true, text: 'Active Unique UIDs (Daily)' } } }
+    });
+    // 4. Average Rank per Subnet (Daily)
+    new Chart(document.getElementById('avgRankDaily'), {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [{ label: 'Average Rank', data: dailyAvgRank.map(d => d.avgRank), borderColor: 'orange', fill: false }]
+      },
+      options: { plugins: { title: { display: true, text: 'Average Rank (Daily)' } } }
+    });
+    // 5. Stake vs. Emission Scatter
+    new Chart(document.getElementById('stakeVsEmission'), {
+      type: 'scatter',
+      data: {
+        datasets: [{ label: 'Stake vs Emission', data: scatterData, backgroundColor: 'teal' }]
+      },
+      options: { plugins: { title: { display: true, text: 'Stake vs. Emission' } }, scales: { x: { title: { display: true, text: 'Stake' } }, y: { title: { display: true, text: 'Emission' } } } }
+    });
+    // 6. Rank Distribution Histogram
+    new Chart(document.getElementById('rankHistogram'), {
+      type: 'bar',
+      data: {
+        labels: Array.from({length: 20}, (_, i) => (i / 20).toFixed(2)),
+        datasets: [{ label: 'Rank Count', data: rankBins, backgroundColor: 'gold' }]
+      },
+      options: { plugins: { title: { display: true, text: 'Rank Distribution Histogram' } }, scales: { x: { title: { display: true, text: 'Rank Bin' } }, y: { title: { display: true, text: 'Count' } } } }
+    });
+    // 7. Heatmap of Active UIDs × Date (as bar for each day)
+    new Chart(document.getElementById('uidsHeatmap'), {
+      type: 'bar',
+      data: {
+        labels: dates,
+        datasets: [{ label: 'Active UIDs (Heatmap)', data: dailyUids.map(d => d.uids), backgroundColor: dailyUids.map(d => `rgba(255,0,0,${d.uids/Math.max(...dailyUids.map(x=>x.uids))})`) }]
+      },
+      options: { plugins: { title: { display: true, text: 'Heatmap of Active UIDs × Date' } } }
+    });
+    // 8. Moving-Average Trends
+    new Chart(document.getElementById('stakeMovingAvg'), {
+      type: 'line',
+      data: { labels: dates, datasets: [{ label: 'Stake 7d MA', data: stakeMA, borderColor: 'blue', fill: false }] },
+      options: { plugins: { title: { display: true, text: 'Stake 7-day Moving Average' } } }
+    });
+    new Chart(document.getElementById('emissionMovingAvg'), {
+      type: 'line',
+      data: { labels: dates, datasets: [{ label: 'Emission 7d MA', data: emissionMA, borderColor: 'green', fill: false }] },
+      options: { plugins: { title: { display: true, text: 'Emission 7-day Moving Average' } } }
+    });
+    new Chart(document.getElementById('uidsMovingAvg'), {
+      type: 'line',
+      data: { labels: dates, datasets: [{ label: 'UIDs 7d MA', data: uidsMA, borderColor: 'purple', fill: false }] },
+      options: { plugins: { title: { display: true, text: 'Active UIDs 7-day Moving Average' } } }
+    });
+    // 9. Cumulative Stake and Emission
+    new Chart(document.getElementById('cumulativeStake'), {
+      type: 'line',
+      data: { labels: dates, datasets: [{ label: 'Cumulative Stake', data: cumulativeStake, borderColor: 'blue', fill: false }] },
+      options: { plugins: { title: { display: true, text: 'Cumulative Stake Over Time' } } }
+    });
+    new Chart(document.getElementById('cumulativeEmission'), {
+      type: 'line',
+      data: { labels: dates, datasets: [{ label: 'Cumulative Emission', data: cumulativeEmission, borderColor: 'green', fill: false }] },
+      options: { plugins: { title: { display: true, text: 'Cumulative Emission Over Time' } } }
+    });
+  });
+</script> 

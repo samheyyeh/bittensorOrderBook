@@ -6,3 +6,4 @@ pandas
 bittensor
 seaborn
 matplotlib
+firebase-admin
