@@ -8,6 +8,8 @@ from subnetFinancialData import fetch_financial_data
 import json
 from datetime import datetime
 
+db = SQLAlchemy()
+
 app = Flask(__name__)
 
 # Database configuration
@@ -21,6 +23,8 @@ else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///subnet_emissions.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+db.init_app(app)
+
 subnet_names = {
     3: "Templar",
     4: "Targon",
@@ -31,6 +35,19 @@ subnet_names = {
     56: "Gradient",
     64: "Chutes"
 }
+
+class SubnetLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    subnet_id = db.Column(db.Integer, nullable=False)
+    uid = db.Column(db.Integer, nullable=False)
+    stake = db.Column(db.Float, nullable=False)
+    emission = db.Column(db.Float, nullable=False)
+    rank = db.Column(db.Float, nullable=False)
+    
+    def __repr__(self):
+        return f'<SubnetLog {self.subnet_id} {self.uid} {self.timestamp}>'
 
 @app.route('/')
 def home():
