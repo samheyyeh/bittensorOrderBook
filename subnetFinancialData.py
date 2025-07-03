@@ -39,7 +39,7 @@ TAOSTATS_TIME_WINDOW = 60  # seconds
 _taostats_request_times = []
 _taostats_lock = threading.Lock()
 
-CACHE_FILE = "instance/financial_cache.json"
+CACHE_FILE = "financial_cache.json"
 CACHE_TTL = timedelta(minutes=5)
 BATCH_SIZE = 5
 
@@ -163,64 +163,17 @@ def get_all_subnet_financial_data_batch(subnet_ids, tao_price_usd):
     print(f"[DEBUG] Batch results: {results}")
     return results
 
-# Helper to get the next batch of subnets to update
-def get_next_batch(all_ids, last_updated, batch_size):
-    if not last_updated:
-        return all_ids[:batch_size], all_ids[batch_size:]
-    # Find the index of the last updated subnet
-    try:
-        idx = all_ids.index(last_updated)
-    except ValueError:
-        idx = -1
-    start = (idx + 1) % len(all_ids)
-    batch = []
-    for i in range(batch_size):
-        batch.append(all_ids[(start + i) % len(all_ids)])
-    return batch, batch[-1]
-
-def refresh_cache_async():
-    def refresh():
-        subnet_ids = list(SUBNETS.keys())
-        tao_price_usd = fetch_tao_price_usd()
-        all_results = {}
-        BATCH_SIZE = 4
-        for i in range(0, len(subnet_ids), BATCH_SIZE):
-            batch = subnet_ids[i:i+BATCH_SIZE]
-            print(f"[DEBUG] Fetching batch: {batch}")
-            batch_results = get_all_subnet_financial_data_batch(batch, tao_price_usd)
-            for row in batch_results:
-                all_results[row["netuid"]] = row
-            # Write cache after each batch
-            try:
-                with open(CACHE_FILE, "w") as f:
-                    json.dump({
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "data": list(all_results.values())
-                    }, f)
-                print(f"[DEBUG] Cache written after batch {batch}: {list(all_results.values())}")
-            except Exception as e:
-                print(f"[DEBUG] Error writing cache after batch {batch}: {e}")
-            if i + BATCH_SIZE < len(subnet_ids):
-                print(f"[DEBUG] Sleeping 60 seconds before next batch...")
-                time.sleep(60)
-    threading.Thread(target=refresh, daemon=True).start()
-
-# Add debug print after cache read in get_cached_financial_data
-def get_cached_financial_data():
-    try:
-        with open(CACHE_FILE, "r") as f:
-            cache = json.load(f)
-        cache_time = datetime.fromisoformat(cache["timestamp"])
-        data = cache.get("data", [])
-        print(f"[DEBUG] Cache read: {data}")
-        if datetime.utcnow() - cache_time < CACHE_TTL:
-            return data
-        else:
-            # Serve stale data, refresh in background
-            refresh_cache_async()
-            return data
-    except Exception as e:
-        print(f"[DEBUG] Error reading cache: {e}")
-        # No cache, trigger refresh and return empty
-        refresh_cache_async()
-        return []
+def get_all_subnet_financial_data_batched():
+    subnet_ids = list(SUBNETS.keys())
+    tao_price_usd = fetch_tao_price_usd()
+    all_results = []
+    BATCH_SIZE = 4
+    for i in range(0, len(subnet_ids), BATCH_SIZE):
+        batch = subnet_ids[i:i+BATCH_SIZE]
+        print(f"[DEBUG] Fetching batch: {batch}")
+        batch_results = get_all_subnet_financial_data_batch(batch, tao_price_usd)
+        all_results.extend(batch_results)
+        if i + BATCH_SIZE < len(subnet_ids):
+            print(f"[DEBUG] Sleeping 60 seconds before next batch...")
+            time.sleep(60)
+    return all_results

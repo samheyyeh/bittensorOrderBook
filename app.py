@@ -4,7 +4,7 @@ from flask import Flask, render_template, jsonify
 import pandas as pd
 import os
 from flask_sqlalchemy import SQLAlchemy
-from subnetFinancialData import get_cached_financial_data
+from subnetFinancialData import get_all_subnet_financial_data_batched
 import matplotlib
 matplotlib.use('Agg')  # Use non-GUI backend for server
 import matplotlib.pyplot as plt
@@ -170,7 +170,7 @@ def home():
 
 @app.route('/financial')
 def financial_dashboard():
-    data = get_cached_financial_data()
+    data = get_all_subnet_financial_data_batched()
     return render_template('subnetFinancialData.html', data=data)
 
 @app.route('/emissions')
