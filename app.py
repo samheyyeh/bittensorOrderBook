@@ -14,7 +14,14 @@ from datetime import datetime
 app = Flask(__name__)
 
 # Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///subnet_emissions.db')
+# Patch for Heroku: convert 'postgres://' to 'postgresql://' for SQLAlchemy
+if 'DATABASE_URL' in os.environ:
+    uri = os.environ['DATABASE_URL']
+    if uri.startswith('postgres://'):
+        uri = uri.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = uri
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///subnet_emissions.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
