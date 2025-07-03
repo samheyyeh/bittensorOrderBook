@@ -180,30 +180,25 @@ def get_next_batch(all_ids, last_updated, batch_size):
 
 def refresh_cache_async():
     def refresh():
-        # Load existing cache if present
-        try:
-            with open(CACHE_FILE, "r") as f:
-                cache = json.load(f)
-            cache_data = {int(row["netuid"]): row for row in cache.get("data", [])}
-            last_updated = cache.get("last_updated")
-        except Exception:
-            cache_data = {}
-            last_updated = None
         subnet_ids = list(SUBNETS.keys())
         tao_price_usd = fetch_tao_price_usd()
-        batch, new_last_updated = get_next_batch(subnet_ids, last_updated, BATCH_SIZE)
-        # Fetch new data for this batch
-        new_data = get_all_subnet_financial_data_batch(batch, tao_price_usd)
-        # Update cache_data with new results
-        for row in new_data:
-            cache_data[row["netuid"]] = row
+        all_results = {}
+        BATCH_SIZE = 4
+        for i in range(0, len(subnet_ids), BATCH_SIZE):
+            batch = subnet_ids[i:i+BATCH_SIZE]
+            print(f"[DEBUG] Fetching batch: {batch}")
+            batch_results = get_all_subnet_financial_data_batch(batch, tao_price_usd)
+            for row in batch_results:
+                all_results[row["netuid"]] = row
+            if i + BATCH_SIZE < len(subnet_ids):
+                print(f"[DEBUG] Sleeping 60 seconds before next batch...")
+                time.sleep(60)
         # Save updated cache
         try:
             with open(CACHE_FILE, "w") as f:
                 json.dump({
                     "timestamp": datetime.utcnow().isoformat(),
-                    "data": list(cache_data.values()),
-                    "last_updated": new_last_updated
+                    "data": list(all_results.values())
                 }, f)
         except Exception:
             pass
