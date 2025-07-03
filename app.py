@@ -21,8 +21,6 @@ else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///subnet_emissions.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db.init_app(app)
-
 subnet_names = {
     3: "Templar",
     4: "Targon",
