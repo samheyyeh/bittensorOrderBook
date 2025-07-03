@@ -32,7 +32,7 @@ RAO_DIVISOR = 10**9
 
 # Rate limiting: 5 requests per minute
 TAOSTATS_RATE_LIMIT = 5
-TAOSTATS_TIME_WINDOW = 40  # seconds
+TAOSTATS_TIME_WINDOW = 20  # seconds
 _taostats_request_times = []
 _taostats_lock = threading.Lock()
 
