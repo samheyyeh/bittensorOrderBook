@@ -41,6 +41,7 @@ _taostats_lock = threading.Lock()
 
 CACHE_FILE = "instance/financial_cache.json"
 CACHE_TTL = timedelta(minutes=5)
+BATCH_SIZE = 5
 
 def taostats_rate_limited_request(*args, **kwargs):
     """Wrap requests.get to rate limit Taostats API calls to 5 per minute."""
@@ -150,12 +151,54 @@ def get_all_subnet_financial_data():
         # Removed time.sleep(60) to avoid Heroku request timeouts. Consider using a background job for periodic data refresh.
     return results
 
+def get_all_subnet_financial_data_batch(subnet_ids, tao_price_usd):
+    results = []
+    for netuid in subnet_ids:
+        results.append(fetch_financial_data(netuid, tao_price_usd=tao_price_usd))
+    return results
+
+# Helper to get the next batch of subnets to update
+def get_next_batch(all_ids, last_updated, batch_size):
+    if not last_updated:
+        return all_ids[:batch_size], all_ids[batch_size:]
+    # Find the index of the last updated subnet
+    try:
+        idx = all_ids.index(last_updated)
+    except ValueError:
+        idx = -1
+    start = (idx + 1) % len(all_ids)
+    batch = []
+    for i in range(batch_size):
+        batch.append(all_ids[(start + i) % len(all_ids)])
+    return batch, batch[-1]
+
 def refresh_cache_async():
     def refresh():
-        data = get_all_subnet_financial_data()
+        # Load existing cache if present
+        try:
+            with open(CACHE_FILE, "r") as f:
+                cache = json.load(f)
+            cache_data = {int(row["netuid"]): row for row in cache.get("data", [])}
+            last_updated = cache.get("last_updated")
+        except Exception:
+            cache_data = {}
+            last_updated = None
+        subnet_ids = list(SUBNETS.keys())
+        tao_price_usd = fetch_tao_price_usd()
+        batch, new_last_updated = get_next_batch(subnet_ids, last_updated, BATCH_SIZE)
+        # Fetch new data for this batch
+        new_data = get_all_subnet_financial_data_batch(batch, tao_price_usd)
+        # Update cache_data with new results
+        for row in new_data:
+            cache_data[row["netuid"]] = row
+        # Save updated cache
         try:
             with open(CACHE_FILE, "w") as f:
-                json.dump({"timestamp": datetime.utcnow().isoformat(), "data": data}, f)
+                json.dump({
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": list(cache_data.values()),
+                    "last_updated": new_last_updated
+                }, f)
         except Exception:
             pass
     threading.Thread(target=refresh, daemon=True).start()
@@ -165,12 +208,13 @@ def get_cached_financial_data():
         with open(CACHE_FILE, "r") as f:
             cache = json.load(f)
         cache_time = datetime.fromisoformat(cache["timestamp"])
+        data = cache.get("data", [])
         if datetime.utcnow() - cache_time < CACHE_TTL:
-            return cache["data"]
+            return data
         else:
             # Serve stale data, refresh in background
             refresh_cache_async()
-            return cache["data"]
+            return data
     except Exception:
         # No cache, trigger refresh and return empty
         refresh_cache_async()
