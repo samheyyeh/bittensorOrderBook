@@ -4,7 +4,7 @@ from flask import Flask, render_template, jsonify
 import pandas as pd
 import os
 from flask_sqlalchemy import SQLAlchemy
-from subnetFinancialData import get_all_subnet_financial_data_batched
+from subnetFinancialData import fetch_financial_data
 import matplotlib
 matplotlib.use('Agg')  # Use non-GUI backend for server
 import matplotlib.pyplot as plt
@@ -12,6 +12,7 @@ import seaborn as sns
 from datetime import datetime
 import json
 from datetime import datetime, timedelta
+from models import db, SubnetEmission
 
 app = Flask(__name__)
 
@@ -26,29 +27,7 @@ else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///subnet_emissions.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
-
-class SubnetEmission(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.DateTime, nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    subnet_id = db.Column(db.Integer, nullable=False)
-    uid = db.Column(db.Integer, nullable=False)
-    stake = db.Column(db.Float, nullable=False)
-    emission = db.Column(db.Float, nullable=False)
-    rank = db.Column(db.Float, nullable=False)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'timestamp': self.timestamp,
-            'date': self.date,
-            'subnet_id': self.subnet_id,
-            'uid': self.uid,
-            'stake': self.stake,
-            'emission': self.emission,
-            'rank': self.rank
-        }
+db.init_app(app)
 
 subnet_names = {
     3: "Templar",
@@ -166,27 +145,18 @@ def generate_emission_plots():
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    return render_template('index.html', subnets=subnet_names)
 
-@app.route('/financial')
-def financial_dashboard():
-    data = get_all_subnet_financial_data_batched()
-    return render_template('subnetFinancialData.html', data=data)
-
-@app.route('/emissions')
-def emissions_dashboard():
-    plot_paths = generate_emission_plots()
-    plot_titles = [
-        'Stake Over Time by Subnet',
-        'Emission vs Stake Scatter by Subnet',
-        'Weekly Emissions by Subnet',
-        'Emission vs Rank (Pareto View)',
-        'Subnet Efficiency (Emission per Stake)',
-        'Rank Distribution by Subnet',
-        'Subnet Growth Over Time (Unique UIDs)'
-    ]
-    plots = list(zip(plot_paths, plot_titles))
-    return render_template('subnetEmissionsData.html', plots=plots)
+@app.route('/subnet/<int:netuid>')
+def subnet_detail(netuid):
+    # Fetch financial data for this subnet
+    data = fetch_financial_data(netuid)
+    # Import here to avoid circular import
+    from generate_emission_plots import generate_all_subnet_charts
+    # Generate all charts for this subnet
+    plots = generate_all_subnet_charts(netuid)
+    subnet_name = subnet_names.get(netuid, f"Subnet {netuid}")
+    return render_template('subnetDetail.html', data=data, plots=plots, subnet_name=subnet_name)
 
 if __name__ == '__main__':
     with app.app_context():

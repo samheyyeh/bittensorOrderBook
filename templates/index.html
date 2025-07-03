@@ -18,13 +18,25 @@
             justify-content: center;
             align-items: center;
         }
-        .dashboard-btn {
-            width: 320px;
-            margin-bottom: 1.5rem;
-            font-size: 1.25rem;
+        .subnet-list {
+            width: 100%;
+            max-width: 400px;
+            margin: 2rem auto;
         }
-        .dashboard-btn:last-child {
-            margin-bottom: 0;
+        .subnet-link {
+            display: block;
+            margin-bottom: 1rem;
+            font-size: 1.15rem;
+            padding: 1rem;
+            background: #23272b;
+            color: #e5e7eb;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .subnet-link:hover {
+            background: #374151;
+            color: #fff;
         }
         h1 {
             color: #fff;
@@ -41,9 +53,12 @@
 <body>
     <div class="centered-content">
         <h1>Bittensor Dashboard</h1>
-        <p class="dashboard-description">Explore real-time data and visualizations across subnets in the Bittensor ecosystem.</p>
-        <a href="/financial" class="btn btn-primary dashboard-btn">View Subnet Financial Data</a>
-        <a href="/emissions" class="btn btn-primary dashboard-btn">View Subnet Emissions Visualizations</a>
+        <p class="dashboard-description">Select a subnet to view its financial data and emissions chart.</p>
+        <div class="subnet-list">
+            {% for netuid, name in subnets.items() %}
+                <a href="/subnet/{{ netuid }}" class="subnet-link">{{ name }} (NetUID: {{ netuid }})</a>
+            {% endfor %}
+        </div>
     </div>
 </body>
 </html>

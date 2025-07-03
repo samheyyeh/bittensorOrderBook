@@ -33,33 +33,6 @@ SUBNETS = {
 
 RAO_DIVISOR = 10**9
 
-# Rate limiting: 5 requests per minute
-TAOSTATS_RATE_LIMIT = 5
-TAOSTATS_TIME_WINDOW = 60  # seconds
-_taostats_request_times = []
-_taostats_lock = threading.Lock()
-
-CACHE_FILE = "financial_cache.json"
-CACHE_TTL = timedelta(minutes=5)
-BATCH_SIZE = 5
-
-def taostats_rate_limited_request(*args, **kwargs):
-    """Wrap requests.get to rate limit Taostats API calls to 5 per minute."""
-    import time
-    global _taostats_request_times
-    with _taostats_lock:
-        now = time.time()
-        # Remove timestamps older than 60 seconds
-        _taostats_request_times = [t for t in _taostats_request_times if now - t < TAOSTATS_TIME_WINDOW]
-        if len(_taostats_request_times) >= TAOSTATS_RATE_LIMIT:
-            sleep_time = TAOSTATS_TIME_WINDOW - (now - _taostats_request_times[0]) + 0.1
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-            now = time.time()
-            _taostats_request_times = [t for t in _taostats_request_times if now - t < TAOSTATS_TIME_WINDOW]
-        _taostats_request_times.append(time.time())
-    return requests.get(*args, **kwargs)
-
 def format_number(value, decimals=2, add_commas=True):
     try:
         num = float(value)
@@ -74,7 +47,7 @@ def format_number(value, decimals=2, add_commas=True):
 def fetch_tao_price_usd():
     # Try Taostats API first
     try:
-        resp = taostats_rate_limited_request("https://api.taostats.io/api/price/latest", headers=HEADERS, timeout=10)
+        resp = requests.get("https://api.taostats.io/api/price/latest", headers=HEADERS, timeout=10)
         resp.raise_for_status()
         data = resp.json()
         # Try to find the price in the response
@@ -99,7 +72,9 @@ def fetch_tao_price_usd():
 def fetch_financial_data(netuid, tao_price_usd=None):
     url = f"https://api.taostats.io/api/dtao/pool/latest/v1?netuid={netuid}&page=1"
     try:
-        response = taostats_rate_limited_request(url, headers=HEADERS)
+        if tao_price_usd is None:
+            tao_price_usd = fetch_tao_price_usd()
+        response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
         data = response.json()["data"][0]
         # Parse TAO values
@@ -139,41 +114,3 @@ def fetch_financial_data(netuid, tao_price_usd=None):
             "name": SUBNETS.get(netuid, f"Subnet {netuid}"),
             "error": str(e)
         }
-
-def get_all_subnet_financial_data():
-    results = []
-    subnet_ids = list(SUBNETS.keys())
-    tao_price_usd = fetch_tao_price_usd()
-    for i in range(0, len(subnet_ids), 4):
-        batch = subnet_ids[i:i+4]
-        for netuid in batch:
-            results.append(fetch_financial_data(netuid, tao_price_usd=tao_price_usd))
-        # Removed time.sleep(60) to avoid Heroku request timeouts. Consider using a background job for periodic data refresh.
-    return results
-
-def get_all_subnet_financial_data_batch(subnet_ids, tao_price_usd):
-    results = []
-    for i, netuid in enumerate(subnet_ids):
-        data = fetch_financial_data(netuid, tao_price_usd=tao_price_usd)
-        print(f"[DEBUG] Data for subnet {netuid}: {data}")
-        results.append(data)
-        if i < len(subnet_ids) - 1:
-            print(f"[DEBUG] Sleeping 60 seconds before next Taostats API request...")
-            time.sleep(20)  # Strict rate limiting: 1 request per minute
-    print(f"[DEBUG] Batch results: {results}")
-    return results
-
-def get_all_subnet_financial_data_batched():
-    subnet_ids = list(SUBNETS.keys())
-    tao_price_usd = fetch_tao_price_usd()
-    all_results = []
-    BATCH_SIZE = 4
-    for i in range(0, len(subnet_ids), BATCH_SIZE):
-        batch = subnet_ids[i:i+BATCH_SIZE]
-        print(f"[DEBUG] Fetching batch: {batch}")
-        batch_results = get_all_subnet_financial_data_batch(batch, tao_price_usd)
-        all_results.extend(batch_results)
-        if i + BATCH_SIZE < len(subnet_ids):
-            print(f"[DEBUG] Sleeping 60 seconds before next batch...")
-            time.sleep(60)
-    return all_results
