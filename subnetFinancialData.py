@@ -150,6 +150,16 @@ def get_all_subnet_financial_data():
         # Removed time.sleep(60) to avoid Heroku request timeouts. Consider using a background job for periodic data refresh.
     return results
 
+def refresh_cache_async():
+    def refresh():
+        data = get_all_subnet_financial_data()
+        try:
+            with open(CACHE_FILE, "w") as f:
+                json.dump({"timestamp": datetime.utcnow().isoformat(), "data": data}, f)
+        except Exception:
+            pass
+    threading.Thread(target=refresh, daemon=True).start()
+
 def get_cached_financial_data():
     try:
         with open(CACHE_FILE, "r") as f:
@@ -157,13 +167,11 @@ def get_cached_financial_data():
         cache_time = datetime.fromisoformat(cache["timestamp"])
         if datetime.utcnow() - cache_time < CACHE_TTL:
             return cache["data"]
+        else:
+            # Serve stale data, refresh in background
+            refresh_cache_async()
+            return cache["data"]
     except Exception:
-        pass
-    # Cache is missing or expired, refresh it
-    data = get_all_subnet_financial_data()
-    try:
-        with open(CACHE_FILE, "w") as f:
-            json.dump({"timestamp": datetime.utcnow().isoformat(), "data": data}, f)
-    except Exception:
-        pass
-    return data
+        # No cache, trigger refresh and return empty
+        refresh_cache_async()
+        return []
