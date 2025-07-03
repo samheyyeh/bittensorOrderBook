@@ -75,18 +75,6 @@
         {% else %}
             <p>No financial data available for this subnet.</p>
         {% endif %}
-        {% if plot_titles and plot_titles|length > 0 %}
-            <div class="emissions-chart">
-                {% for plot_type, title in plot_titles.items() %}
-                    <h4>{{ title }}</h4>
-                    <img src="{{ url_for('subnet_plot', netuid=netuid, plot_type=plot_type) }}" class="img-fluid border rounded shadow-sm mb-4" alt="{{ title }}">
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="emissions-chart">
-                <p>No emissions data available for this subnet.</p>
-            </div>
-        {% endif %}
     </div>
 </body>
 </html> 
