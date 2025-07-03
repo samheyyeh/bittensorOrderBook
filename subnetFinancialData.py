@@ -153,8 +153,10 @@ def get_all_subnet_financial_data():
 
 def get_all_subnet_financial_data_batch(subnet_ids, tao_price_usd):
     results = []
-    for netuid in subnet_ids:
+    for i, netuid in enumerate(subnet_ids):
         results.append(fetch_financial_data(netuid, tao_price_usd=tao_price_usd))
+        if i < len(subnet_ids) - 1:
+            time.sleep(13)  # Pause to avoid burst rate limiting (5 req/min)
     return results
 
 # Helper to get the next batch of subnets to update
