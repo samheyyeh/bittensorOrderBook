@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 import os
+import base64
+
+# Decode firebase_key.json from environment variable if present
+if os.environ.get('FIREBASE_KEY_BASE64'):
+    with open('firebase_key.json', 'wb') as f:
+        f.write(base64.b64decode(os.environ['FIREBASE_KEY_BASE64']))
+
 from datetime import datetime
 import bittensor
 import firebase_admin
