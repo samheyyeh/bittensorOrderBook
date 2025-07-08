@@ -7,3 +7,4 @@ bittensor
 seaborn
 matplotlib
 firebase-admin
+openai>=1.0.0
